@@ -1,5 +1,7 @@
 #include <iostream>
 
 int main() {
-    std::cout << "hello world" << "\n";
+    for (int i = 0; i < 5; i += 1) {
+        std::cout << i << "\n";
+    }
 }

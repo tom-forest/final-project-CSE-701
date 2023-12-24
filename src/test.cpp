@@ -24,7 +24,7 @@ public:
      * 
      * @param initial_value 
      */
-    bigint(int64_t initial_value);
+    bigint(const int64_t& initial_value);
 
     /**
      * @brief Construct a new bigint object from a string of numbers.
@@ -64,12 +64,16 @@ public:
     void operator=(const string& r_value);
 
     /**
-     * @brief Compares both bigints. Returns 1 if caller is greater, 0 if it is equal, -1 else.
+     * @brief   Compares both bigints. Returns 1 if caller is greater, 0 if it is equal, -1 else.
+     *          Setting signed_comparison to false will make the comparison act as if second_int
+     *          had the same sign as the caller. Note that the result still depends on the caller's
+     *          sign.
      * 
      * @param second_int 
+     * @param signed_comparisson
      * @return int 
      */
-    int compare(const bigint& second_int) const;
+    int8_t compare(const bigint& second_int, bool signed_comparisson = true) const;
 
     /**
      * @brief Compares the numerical values of the caller and second_int.
@@ -116,6 +120,20 @@ public:
      */
     bool operator>=(const bigint& second_int) const;
 
+    void operator+=(const bigint& second_int);
+
+    void operator-=(const bigint& second_int);
+
+    void operator*=(const bigint& second_int);
+
+    bigint operator-() const;
+
+    bigint operator*(const bigint& second_int) const;
+
+    bigint operator+(const bigint& second_int) const;
+
+    bigint operator-(const bigint& second_int) const;
+
 
 private:
     /**
@@ -125,10 +143,10 @@ private:
     vector<uint64_t> values;
 
     /**
-     * @brief Stores the sign of the bigint. True is positive. Because reasons.
+     * @brief Stores the sign of the bigint. 1 is positive, -1 is negative.
      * 
      */
-    bool sign;
+    int8_t sign;
 
     /**
      * @brief Assigns the value represented by a string of digits to the bigint.
@@ -136,7 +154,24 @@ private:
      * @param number String of digits.
      */
     void assign_string(const string& number);
+
+    /**
+     * @brief   Assigns the result of the addition with second_int to the caller.
+     * 
+     * @param second_int bigint to add to the caller.
+     * @param add_sign Sign of the operation to perform. 1 or -1;
+     */
+    void assign_add(const bigint& second_int, const int8_t& add_sign);
+
+    /**
+     * @brief Removes empty fields of values.
+     * 
+     */
+    void remove_empty_values();
 };
+
+
+
 
 /**
  * @brief Constant used for computations by blocs of ~32 bits. Bad practice but computing it everytime would be a waste.
@@ -146,13 +181,28 @@ static uint64_t STEP_32 = (uint64_t) log10(UINT32_MAX) - 1;
 
 
 /**
+ * @brief Performs the a + b addition while checking for overflow. Carry is set to 1 if overflow occurs, 0 else.
+ * 
+ * @param a 
+ * @param b 
+ * @param carry 
+ * @return uint64_t 
+ */
+static uint64_t add_check_overflow(const uint64_t& a, const uint64_t& b, uint64_t& carry) {
+    uint64_t result = a + b;
+    carry = result < a ? 1 : 0;
+    return result;
+}
+
+
+/**
  * @brief Power function that uses uint64_t variables internally. Does not check for overflow.
  * 
  * @param base 
  * @param exp 
  * @return uint64_t 
  */
-static uint64_t pow_64(uint64_t base, uint64_t exp) {
+static uint64_t pow_64(const uint64_t& base, const uint64_t& exp) {
     uint64_t res = 1;
     for (uint64_t i = 0; i < exp; i++) {
         res *= base;
@@ -167,13 +217,9 @@ static uint64_t pow_64(uint64_t base, uint64_t exp) {
  * @param number 
  */
 static void truncate_0s(string& number) {
-    uint64_t l = number.length();
-    uint64_t i = 0;
-    while (number[i] == '0' and i < l) {
-        i ++;
+    while (number[0] == '0') {
+        number.erase(0, 1);
     }
-
-    number = number.substr(i, l);
 }
 
 
@@ -183,7 +229,7 @@ static void truncate_0s(string& number) {
  * @param number String of digits to modify.
  * @param n_0s Number of 0s to add.
  */
-static void add_0s(string& number, uint64_t n_0s) {
+static void add_0s(string& number, const uint64_t& n_0s) {
     for (uint64_t i = 0; i < n_0s; i++) {
         number = "0" + number;
     }
@@ -262,7 +308,7 @@ static uint64_t string_euclid_64(const string& number, string& result) {
  * @param len Number of digits to extract.
  * @return uint64_t 
  */
-static uint64_t string_to_64(const string& number, uint64_t pos, uint64_t len) {
+static uint64_t string_to_64(const string& number, const uint64_t& pos, const uint64_t& len) {
     if (len == 0) {
         return 0;
     }
@@ -282,7 +328,7 @@ static uint64_t string_to_64(const string& number, uint64_t pos, uint64_t len) {
  * @param b Reach.
  * @param l Length.
  */
-static void adjust_index(uint64_t& i, uint64_t& b, uint64_t l) {
+static void adjust_index(uint64_t& i, uint64_t& b, const uint64_t& l) {
     //  Change this from <= to < for a sort of subtle and long to fix bug.
     if (i <= l) {
             b = 2 * STEP_32;
@@ -427,16 +473,36 @@ static int compare_64(const uint64_t& v1, const uint64_t& v2) {
 }
 
 
+/**
+ * @brief Applies one's complement to given number.
+ * 
+ * @param number 
+ */
+static void ones_complement(uint64_t& number) {
+    number = number xor UINT64_MAX;
+}
+
+
+void bigint::remove_empty_values() {
+    uint64_t values_size = values.size();
+    for (uint64_t i = 0; i < values_size - 1; i++) {
+        if (values[values_size - i - 1] == 0) {
+            values.pop_back();
+        }
+    }
+}
+
+
 void bigint::assign_string(const string& number) {
     string value_buffer = number;
     string result_buffer = "";
 
     if (value_buffer.length() > 0 and value_buffer[0] == '-') {
-        sign = false;
+        sign = -1;
         value_buffer.erase(0, 1);
     }
     else {
-        sign = true;
+        sign = 1;
     }
 
     //  Checking for incorrect characters in the string.
@@ -457,11 +523,86 @@ void bigint::assign_string(const string& number) {
 }
 
 
+void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
+    uint64_t carry = 0, numbuffer;
+    uint64_t l1 = values.size(), l2 = second_int.values.size();
+    uint64_t long_length = max(l1, l2);
+
+    int8_t effective_sign = sign * add_sign * second_int.sign;
+    int8_t result_sign;
+
+    if (effective_sign < 0) {
+        result_sign = compare(second_int, false);
+        if (result_sign == 0) {
+            result_sign = 1;
+        }
+    }
+    else {
+        result_sign = sign;
+    }
+
+    sign = result_sign;
+
+    for (uint64_t i = 0; i < long_length or carry != 0; i++) {
+
+        //  If end of vector reached, add space.
+        if (i >= l1) {
+            values.push_back(0ULL);
+        }
+
+        // Add carry, check for overflow
+        numbuffer = values[i];
+
+        if (effective_sign < 0) {
+            ones_complement(numbuffer);
+        }
+
+        numbuffer = add_check_overflow(numbuffer, carry, carry);
+
+        // If end of second bigint vector not reached yet add its value.
+        if (i < l2) {
+
+            //  Only check for overlfow if no overflow occured yet. Math says two overflows is impossible.
+            if (carry != 0) {
+                numbuffer += second_int.values[i];
+            }
+            else {
+                numbuffer = add_check_overflow(numbuffer, second_int.values[i], carry);
+            }
+        }
+
+        // Update vector value.
+        values[i] = numbuffer;
+
+        if (i + 1 == long_length and effective_sign < 0) {
+            break;
+        }
+    }
+
+    if (effective_sign < 0) {
+        if (carry == 0) {
+            for (uint64_t i = 0; i < long_length; i++) {
+                ones_complement(values[i]);
+            }
+        }
+        else {
+            for (uint64_t i = 0; i < long_length and carry != 0; i++) {
+                numbuffer = values[i];
+                numbuffer = add_check_overflow(numbuffer, carry, carry);
+                values[i] = numbuffer;
+            }
+        }
+
+        remove_empty_values();
+    }
+}
+
+
 bigint::bigint() : values({0}), sign(true) {}
 
-bigint::bigint(int64_t initial_value) {
-    sign = initial_value >= 0;
-    uint64_t n_val = sign ? initial_value : -initial_value;
+bigint::bigint(const int64_t& initial_value) {
+    sign = initial_value >= 0 ? 1 : -1;
+    uint64_t n_val = (uint64_t) (initial_value * (int64_t) sign);
     values.push_back(n_val);
 }
 
@@ -481,8 +622,12 @@ string bigint::to_string() const{
         value_string = buffer_result;
     }
 
-    if (!sign) {
+    if (sign < 0) {
         value_string = "-" + value_string;
+    }
+
+    if (value_string == "") {
+        value_string = "0";
     }
 
     return value_string;
@@ -502,24 +647,22 @@ void bigint::operator=(const string& r_value) {
     assign_string(r_value);
 }
 
-int bigint::compare(const bigint& second_int) const {
-    int sign_int = sign ? 1 : -1;
-
-    if (sign != second_int.sign) {
-        return sign_int;
+int8_t bigint::compare(const bigint& second_int, bool signed_comparisson) const {
+    if (sign != second_int.sign and signed_comparisson) {
+        return sign;
     }
 
     uint64_t values_size = values.size();
     uint64_t second_size = second_int.values.size();
     if (values_size != second_size) {
-        return sign_int * (values_size > second_size ? 1 : -1);
+        return sign * (int8_t) (values_size > second_size ? 1 : -1);
     }
 
     int comparisson = 0;
     for (uint64_t i = 0; i < values_size; i++) {
         comparisson += compare_64(values[values_size - i - 1], second_int.values[values_size - i - 1]);
         if (comparisson != 0) {
-            return comparisson * sign_int;
+            return comparisson * sign;
         }
     }
     return 0;
@@ -545,9 +688,37 @@ bool bigint::operator>=(const bigint& second_int) const {
     return compare(second_int) >= 0;
 }
 
+void bigint::operator+=(const bigint& second_int) {
+    assign_add(second_int, 1);
+}
+
+void bigint::operator-=(const bigint& second_int) {
+    assign_add(second_int, -1);
+}
+
+void bigint::operator*=(const bigint& second_int) {
+
+}
+
+bigint bigint::operator-() const {
+
+}
+
+bigint bigint::operator*(const bigint& second_int) const {
+
+}
+
+bigint bigint::operator+(const bigint& second_int) const {
+
+}
+
+bigint bigint::operator-(const bigint& second_int) const {
+
+}
+
 int main() {
-    bigint a("-99999999999999999999999999999999");
-    bigint b = a;
-    a = "091872390817908712309487";
-    cout << a << "\n" << b << "\n";
+    bigint a("100000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    bigint b("1");
+    a -= b;
+    cout << a << "\n";
 }

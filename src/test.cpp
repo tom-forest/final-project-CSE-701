@@ -34,6 +34,13 @@ public:
     bigint(const string& initial_value);
 
     /**
+     * @brief Construct a new bigint object from an other bigint object.
+     * 
+     * @param source_int 
+     */
+    bigint(const bigint& source_int);
+
+    /**
      * @brief Outputs the number in base 10.
      * 
      * @param os 
@@ -120,13 +127,22 @@ public:
      */
     bool operator>=(const bigint& second_int) const;
 
+    /**
+     * @brief Compares the numerical values of the caller and second_int.
+     * 
+     * @param second_int 
+     * @return true 
+     * @return false 
+     */
+    bool operator!=(const bigint& second_int) const;
+
     void operator+=(const bigint& second_int);
 
     void operator-=(const bigint& second_int);
 
     void operator*=(const bigint& second_int);
 
-    bigint operator-() const;
+    bigint operator-();
 
     bigint operator*(const bigint& second_int) const;
 
@@ -528,7 +544,8 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
     uint64_t l1 = values.size(), l2 = second_int.values.size();
     uint64_t long_length = max(l1, l2);
 
-    int8_t effective_sign = sign * add_sign * second_int.sign;
+    //  int8_t casts are here to prevent warnings.
+    int8_t effective_sign = (int8_t) ((int8_t) (sign * add_sign) * second_int.sign);
     int8_t result_sign;
 
     if (effective_sign < 0) {
@@ -610,6 +627,8 @@ bigint::bigint(const string& number_string) {
     assign_string(number_string);
 }
 
+bigint::bigint(const bigint& source_int) : values(source_int.values), sign(source_int.sign) {}
+
 string bigint::to_string() const{
     string value_string = "";
     string buffer_result;
@@ -655,14 +674,14 @@ int8_t bigint::compare(const bigint& second_int, bool signed_comparisson) const 
     uint64_t values_size = values.size();
     uint64_t second_size = second_int.values.size();
     if (values_size != second_size) {
-        return sign * (int8_t) (values_size > second_size ? 1 : -1);
+        return (int8_t) (sign * (int8_t) (values_size > second_size ? 1 : -1));
     }
 
     int comparisson = 0;
     for (uint64_t i = 0; i < values_size; i++) {
         comparisson += compare_64(values[values_size - i - 1], second_int.values[values_size - i - 1]);
         if (comparisson != 0) {
-            return comparisson * sign;
+            return (int8_t) (comparisson * sign);
         }
     }
     return 0;
@@ -688,6 +707,10 @@ bool bigint::operator>=(const bigint& second_int) const {
     return compare(second_int) >= 0;
 }
 
+bool bigint::operator!=(const bigint& second_int) const {
+    return compare(second_int) != 0;
+}
+
 void bigint::operator+=(const bigint& second_int) {
     assign_add(second_int, 1);
 }
@@ -700,8 +723,10 @@ void bigint::operator*=(const bigint& second_int) {
 
 }
 
-bigint bigint::operator-() const {
-
+bigint bigint::operator-() {
+    bigint new_bigint(*this);
+    new_bigint.sign *= -1;
+    return new_bigint;
 }
 
 bigint bigint::operator*(const bigint& second_int) const {
@@ -709,16 +734,20 @@ bigint bigint::operator*(const bigint& second_int) const {
 }
 
 bigint bigint::operator+(const bigint& second_int) const {
-
+    bigint new_bigint(*this);
+    new_bigint += second_int;
+    return new_bigint;
 }
 
 bigint bigint::operator-(const bigint& second_int) const {
-
+    bigint new_bigint(*this);
+    new_bigint -= second_int;
+    return new_bigint;
 }
 
 int main() {
     bigint a("100000000000000000000000000000000000000000000000000000000000000000000000000000000");
-    bigint b("1");
-    a -= b;
+    bigint b("100000000000000000000000000000000000000000000000000000000000000000000000000000000");
+    a += b;
     cout << a << "\n";
 }

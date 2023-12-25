@@ -1,9 +1,9 @@
-#include <bigint.hpp>
+#include "bigint.hpp"
 #include <iostream>
 
 using namespace std;
 
 int main() {
-    bigint a();
+    bigint a;
     cout << a;
 }

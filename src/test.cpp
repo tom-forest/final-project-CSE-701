@@ -136,18 +136,56 @@ public:
      */
     bool operator!=(const bigint& second_int) const;
 
+    /**
+     * @brief Adds the numerical value of second_int to the caller's.
+     * 
+     * @param second_int 
+     */
     void operator+=(const bigint& second_int);
 
+    /**
+     * @brief Substracts the numerical value of second_int from the caller's.
+     * 
+     * @param second_int 
+     */
     void operator-=(const bigint& second_int);
 
+    /**
+     * @brief Multiplies the caller's numerical value by second_int's.
+     * 
+     * @param second_int 
+     */
     void operator*=(const bigint& second_int);
 
+    /**
+     * @brief Changes the caller's sign.
+     * 
+     * @return bigint 
+     */
     bigint operator-();
 
+    /**
+     * @brief Computes the product of the caller and second_int's numerical values and returns the result.
+     * 
+     * @param second_int 
+     * @return bigint 
+     */
     bigint operator*(const bigint& second_int) const;
 
+    /**
+     * @brief Computes the sum of the caller and second_int's numerical values and returns the result.
+     * 
+     * @param second_int 
+     * @return bigint 
+     */
     bigint operator+(const bigint& second_int) const;
 
+    /**
+     * @brief Computes the difference between the caller and second_int's numerical values and returns the result.
+     * 
+     * @param second_int 
+     * @return bigint 
+     */
     bigint operator-(const bigint& second_int) const;
 
 
@@ -173,6 +211,7 @@ private:
 
     /**
      * @brief   Assigns the result of the addition with second_int to the caller.
+     *          I was very sick when I wrote this and it shows, sorry. Should be split up into more functions for encapsulation.
      * 
      * @param second_int bigint to add to the caller.
      * @param add_sign Sign of the operation to perform. 1 or -1;
@@ -180,7 +219,8 @@ private:
     void assign_add(const bigint& second_int, const int8_t& add_sign);
 
     /**
-     * @brief Removes empty fields of values.
+     * @brief   Removes fields of values that represent useless 0s at the front of a number.
+     *          Used for cleaning up bigints after some operations.
      * 
      */
     void remove_empty_values();
@@ -195,6 +235,12 @@ private:
 
 
 
+
+
+
+
+
+//  ----------------------------------------STATIC FUNCTIONS----------------------------------------
 
 /**
  * @brief Constant used for computations by blocs of ~32 bits. Bad practice but computing it everytime would be a waste.
@@ -523,6 +569,14 @@ static void select_32_in_64(uint64_t& value, const uint64_t& index) {
 }
 
 
+
+
+
+
+
+
+//  ----------------------------------------PRIVATE METHODS AND PROCEDURES----------------------------------------
+
 void bigint::set_values_to_zero() {
     for(uint64_t& val : values) {
         val = 0ULL;
@@ -571,14 +625,21 @@ void bigint::assign_string(const string& number) {
 
 
 void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
+    /*  My apologies for this ugly function, I had no time to clean it.
+        It is stable and rather efficient but clearly violates encapsulation principle.
+        Also, sorry for the poor variable name choices and over-the-top casts.
+    */
+
     uint64_t carry = 0, numbuffer;
     uint64_t l1 = values.size(), l2 = second_int.values.size();
     uint64_t long_length = max(l1, l2);
 
     //  int8_t casts are here to prevent warnings.
+    //  Compute wether the actual operation is a sum or substraction.
     int8_t effective_sign = (int8_t) ((int8_t) (sign * add_sign) * second_int.sign);
     int8_t result_sign;
 
+    //  Compute result's sign as this implementation of one's complenent does not do it to allow the number's memory size to grow.
     if (effective_sign < 0) {
         result_sign = compare(second_int, false);
         if (result_sign == 0) {
@@ -607,7 +668,7 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
 
         numbuffer = add_check_overflow(numbuffer, carry, carry);
 
-        // If end of second bigint vector not reached yet add its value.
+        //  If end of second bigint vector not reached yet add its value.
         if (i < l2) {
 
             //  Only check for overlfow if no overflow occured yet. Math says two overflows is impossible.
@@ -619,7 +680,7 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
             }
         }
 
-        // Update vector value.
+        //  Update vector value.
         values[i] = numbuffer;
 
         if (i + 1 == long_length and effective_sign < 0) {
@@ -627,6 +688,7 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
         }
     }
 
+    //  One's complement shenanigans. If there is a carry, add it to the result. Else, get one's complement of the result.
     if (effective_sign < 0) {
         if (carry == 0) {
             for (uint64_t i = 0; i < long_length; i++) {
@@ -641,10 +703,26 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
             }
         }
 
+        /*  Clean possible free space at the front of the result.
+            Do it only for effective_sign < 0 or it might break multiplication
+            (multiplication makes use of this free space to avoid checking for vector lengths all the time but only uses additions).
+            If the absolute value of the number grows it is useless to do it anyways.
+            Might be a problem for a future implementation of division.
+        */
         remove_empty_values();
     }
 }
 
+
+
+
+
+
+
+
+//  ----------------------------------------PUBLIC METHODS AND PROCEDURES----------------------------------------
+
+//  CONSTRUCTORS
 
 bigint::bigint() : values({0}), sign(true) {}
 
@@ -659,6 +737,11 @@ bigint::bigint(const string& number_string) {
 }
 
 bigint::bigint(const bigint& source_int) : values(source_int.values), sign(source_int.sign) {}
+
+
+
+
+//  HELPER METHODS AND PROCEDURES
 
 string bigint::to_string() const{
     string value_string = "";
@@ -683,19 +766,6 @@ string bigint::to_string() const{
     return value_string;
 }
 
-ostream& operator<<(ostream& os, const bigint& number) {
-    os << number.to_string();
-    return os;
-}
-
-void bigint::operator=(const bigint& r_value) {
-    values = r_value.values;
-    sign = r_value.sign;
-}
-
-void bigint::operator=(const string& r_value) {
-    assign_string(r_value);
-}
 
 int8_t bigint::compare(const bigint& second_int, bool signed_comparisson) const {
     if (sign != second_int.sign and signed_comparisson) {
@@ -716,6 +786,25 @@ int8_t bigint::compare(const bigint& second_int, bool signed_comparisson) const 
         }
     }
     return 0;
+}
+
+
+
+
+//  OPERATOR OVERLOADS
+
+ostream& operator<<(ostream& os, const bigint& number) {
+    os << number.to_string();
+    return os;
+}
+
+void bigint::operator=(const bigint& r_value) {
+    values = r_value.values;
+    sign = r_value.sign;
+}
+
+void bigint::operator=(const string& r_value) {
+    assign_string(r_value);
 }
 
 bool bigint::operator<(const bigint& second_int) const {

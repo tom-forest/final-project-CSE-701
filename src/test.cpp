@@ -184,6 +184,13 @@ private:
      * 
      */
     void remove_empty_values();
+
+    /**
+     * @brief   Set all existing fields of values to 0.
+     *          Used for multiplication.
+     * 
+     */
+    void set_values_to_zero();
 };
 
 
@@ -499,6 +506,30 @@ static void ones_complement(uint64_t& number) {
 }
 
 
+/**
+ * @brief   Modifies given value to store either of its 2 32 blocs content depending on index parity.
+ *          If index is even, the fisrt bloc is selected. Else, the second.
+ * 
+ * @param value 
+ * @param index 
+ */
+static void select_32_in_64(uint64_t& value, const uint64_t& index) {
+    if (index % 2 == 0) {
+        value %= 0x100000000ULL;
+    }
+    else {
+        value /= 0x100000000ULL;
+    }
+}
+
+
+void bigint::set_values_to_zero() {
+    for(uint64_t& val : values) {
+        val = 0ULL;
+    }
+}
+
+
 void bigint::remove_empty_values() {
     uint64_t values_size = values.size();
     for (uint64_t i = 0; i < values_size - 1; i++) {
@@ -720,7 +751,7 @@ void bigint::operator-=(const bigint& second_int) {
 }
 
 void bigint::operator*=(const bigint& second_int) {
-
+    *this = *this * second_int;
 }
 
 bigint bigint::operator-() {
@@ -730,7 +761,53 @@ bigint bigint::operator-() {
 }
 
 bigint bigint::operator*(const bigint& second_int) const {
+    bigint intermediate_buffer_0, intermediate_buffer_32, result_buffer;
 
+    uint64_t l1 = values.size(), l2 = second_int.values.size();
+
+    uint64_t operation_buffer, operand_buffer;
+
+    //  Making enough room to store everything in the buffer bigints.
+    for (uint64_t i = 1; i < l1 + l2; i++) {
+        intermediate_buffer_0.values.push_back(0ULL);
+        intermediate_buffer_32.values.push_back(0ULL);
+        result_buffer.values.push_back(0ULL);
+    }
+
+    //  Iterating on 32 bits blocs.
+    for (uint64_t i = 0; i < 2 * l1; i++) {
+        intermediate_buffer_0.set_values_to_zero();
+        intermediate_buffer_32.set_values_to_zero();
+
+        operand_buffer = values[i / 2];
+        select_32_in_64(operand_buffer, i);
+
+        //  32 bits blocs ftw !
+        for (uint64_t j = 0; j < 2 * l2; j++) {
+            operation_buffer = second_int.values[j / 2];
+            select_32_in_64(operation_buffer, j);
+
+            //  The actual product
+            operation_buffer *= operand_buffer;
+
+            //  Choose which buffer to update
+            if ((i + j) % 2 == 0) {
+                intermediate_buffer_0.values[(i + j) / 2] = operation_buffer;
+            }
+            else {
+                intermediate_buffer_32.values[(i + j) / 2] += (operation_buffer % 0x100000000ULL) * 0x100000000ULL;
+                intermediate_buffer_32.values[(i + j) / 2 + 1] += operation_buffer / 0x100000000ULL;
+            }
+        }
+
+        //  Add both to the result.
+        result_buffer += intermediate_buffer_0;
+        result_buffer += intermediate_buffer_32;
+    }
+
+    result_buffer.sign = (int8_t) (sign * second_int.sign);
+    result_buffer.remove_empty_values();
+    return result_buffer;
 }
 
 bigint bigint::operator+(const bigint& second_int) const {
@@ -746,8 +823,7 @@ bigint bigint::operator-(const bigint& second_int) const {
 }
 
 int main() {
-    bigint a("100000000000000000000000000000000000000000000000000000000000000000000000000000000");
-    bigint b("100000000000000000000000000000000000000000000000000000000000000000000000000000000");
-    a += b;
-    cout << a << "\n";
+    bigint a("50000000000000000000000000000000000000000000000000000000");
+    bigint b("50000000000000000000000000000000000000000000000000000000");
+    cout << a * b << "\n";
 }

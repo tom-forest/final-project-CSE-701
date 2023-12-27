@@ -249,7 +249,7 @@ private:
  * @brief Constant used for computations by blocs of ~32 bits. Bad practice but computing it everytime would be a waste.
  * 
  */
-static uint64_t STEP_32 = (uint64_t) log10(UINT32_MAX) - 1;
+static const uint64_t STEP_32 = (uint64_t) log10(UINT32_MAX) - 1;
 
 
 /**
@@ -268,7 +268,8 @@ static uint64_t add_check_overflow(const uint64_t& a, const uint64_t& b, uint64_
 
 
 /**
- * @brief Power function that uses uint64_t variables internally. Does not check for overflow.
+ * @brief   Power function that uses uint64_t variables internally. Does not check for overflow.
+ *          Very inneficient, needs to be optimized later.
  * 
  * @param base 
  * @param exp 
@@ -662,13 +663,13 @@ void bigint::assign_add(const bigint& second_int, const int8_t& add_sign) {
             values.push_back(0ULL);
         }
 
-        // Add carry, check for overflow
         numbuffer = values[i];
 
         if (effective_sign < 0) {
             ones_complement(numbuffer);
         }
 
+        // Add carry, check for overflow
         numbuffer = add_check_overflow(numbuffer, carry, carry);
 
         //  If end of second bigint vector not reached yet add its value.
